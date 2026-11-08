@@ -55,7 +55,6 @@
   .eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); background:none; border:0; color:var(--mut); cursor:pointer; padding:6px 8px; line-height:0; }
   .eye:hover { color:var(--txt); }
   .barRow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .found button { background:#2a3038; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:6px 10px; cursor:pointer; margin:6px 6px 0 0; font:inherit; }
   pre { background:#0b0d10; border:1px solid var(--line); border-radius:8px; padding:8px; overflow:auto; font-size:12px; max-height:220px; white-space:pre-wrap; word-break:break-all; margin:8px 0 0; }
   table { width:100%; border-collapse:collapse; font:13px ui-monospace,monospace; }
   td { padding:4px 6px; border-bottom:1px solid var(--line); word-break:break-all; } td:first-child { color:var(--mut); width:55%; }
@@ -79,8 +78,8 @@
     </div>
     <div class="row">
       <div><label for="sn">Серийный номер станции (16 символов)</label><input id="sn" name="sn" autocomplete="off" spellcheck="false" required>
-        <button class="btn sec" type="button" id="find" style="margin-top:6px">Найти серийник (экспериментально)</button>
-        <div class="found" id="found"></div></div>
+        <button class="btn sec" type="button" id="find" style="margin-top:6px">Найти мои устройства</button>
+        <select id="devSel" style="margin-top:8px" hidden aria-label="Устройства аккаунта"></select></div>
       <div><label for="base">Сервер</label>
         <select id="base">
           <option value="https://api.ecoflow.com">api.ecoflow.com</option>
@@ -102,7 +101,6 @@
     <button class="btn sec" id="showForm" type="button" style="margin-top:0">Настройки</button>
   </div>
   <div id="msg" class="small" style="margin-top:8px"></div>
-  <pre id="findLog" hidden></pre>
   <button class="btn sec" id="install" type="button" hidden>Установить как приложение</button>
   <p class="small">Страница общается напрямую с серверами EcoFlow, никаких других серверов у неё нет. Вкладка должна быть открыта, чтобы данные обновлялись: закрыли вкладку, и соединение закрылось.</p>
 </div>
@@ -523,24 +521,24 @@ setEye(false);
 $('eye').onclick = () => { const show = $('pw').type === 'password'; $('pw').type = show ? 'text' : 'password'; setEye(show); };
 $('showForm').onclick = () => { $('f').hidden = !$('f').hidden; };
 
-// ---------- find serial number (experimental) ----------
-// The documented device-list call (/iot-open/sign/device/list) needs developer keys. With an app login we can only try
-// the app's own (undocumented) endpoints. These paths are unverified guesses; every attempt is shown so nothing is hidden.
-const FIND_PATHS = ['/iot-service/user/device', '/iot-service/user/device/list', '/provider-service/user/device/list'];
-function collectSerials(node, out) {
-  if (Array.isArray(node)) { node.forEach(n => collectSerials(n, out)); return; }
-  if (!node || typeof node !== 'object') return;
-  for (const k of Object.keys(node)) {
-    const v = node[k];
-    if (/^(sn|deviceSn|serialNumber)$/i.test(k) && typeof v === 'string' && /^[A-Z][A-Z0-9]{9,19}$/.test(v))
-      out.set(v, String(node.deviceName || node.name || node.productName || ''));
-    else collectSerials(v, out);
+// ---------- find the device serial number ----------
+// App-login endpoint: data.bound / data.share / data.third / data.matter are maps keyed by serial number, e.g.
+// {"data":{"bound":{"R621ZEB6XG8K0002":{"deviceName":"RIVER 2 Pro-0002","online":1,...}},"share":{},...}}
+function listDevices(data) {
+  const out = [];
+  const groups = [['bound', ''], ['share', 'общий доступ'], ['third', 'сторонние'], ['matter', 'matter']];
+  for (const [key, label] of groups) {
+    const g = data && data[key]; if (!g || typeof g !== 'object') continue;
+    const entries = Array.isArray(g) ? g.map(d => [d && (d.sn || d.deviceSn), d]) : Object.entries(g);
+    for (const [sn, d] of entries) if (sn && typeof sn === 'string') out.push({ sn, name: String((d && d.deviceName) || ''), online: d && d.online, label });
   }
+  return out;
 }
+function fillSerial(sn) { $('sn').value = sn; saveSettings(); }
+$('devSel').onchange = () => { const v = $('devSel').value; if (v) { fillSerial(v); msg('Серийный номер подставлен.', 'ok'); } };
 $('find').onclick = async () => {
-  const email = $('email').value.trim(), password = $('pw').value, base = $('base').value;
-  const log = $('findLog'), box = $('found'); box.textContent = ''; log.hidden = false; log.textContent = '';
-  const add = t => { log.textContent += t + '\n'; };
+  const email = $('email').value.trim(), password = $('pw').value, base = $('base').value, sel = $('devSel');
+  sel.hidden = true; sel.textContent = '';
   if (!email || !password) { msg('Для поиска нужны email и пароль.', 'bad'); return; }
   msg('Ищу устройства…', 'warn'); $('find').disabled = true;
   try {
@@ -548,22 +546,22 @@ $('find').onclick = async () => {
       body: JSON.stringify({ email, password: b64(password), scene:'IOT_APP', userType:'ECOFLOW', oauth:{ bundleId:'com.ef.EcoFlow' }, os:'android', osVersion:'13', appVersion:'1.0.0' }) });
     const login = await r1.json();
     if (String(login.code) !== '0') throw new Error(`Вход не удался: ${login.code} ${login.message}`);
-    const token = login.data.token, found = new Map();
-    for (const path of FIND_PATHS) {
-      try {
-        const r = await fetch(base + path, { headers:{ Authorization:'Bearer ' + token } });
-        const txt = await r.text(); add(`${path} → HTTP ${r.status}: ${txt.slice(0, 300)}`);
-        try { collectSerials(JSON.parse(txt), found); } catch {}
-      } catch (e) { add(`${path} → ошибка: ${e.message}`); }
+    const r2 = await fetch(base + '/iot-service/user/device', { headers:{ Authorization:'Bearer ' + login.data.token } });
+    const res = await r2.json();
+    if (String(res.code) !== '0') throw new Error(`Список устройств не получен: ${res.code} ${res.message || ''}`);
+    const devices = listDevices(res.data);
+    if (!devices.length) { msg('На этом аккаунте устройств не найдено. Проверьте сервер (api / api-e) или введите серийник вручную.', 'warn'); return; }
+    if (devices.length > 1) { const o = document.createElement('option'); o.value = ''; o.textContent = '— выберите устройство —'; sel.appendChild(o); }
+    for (const d of devices) {
+      const o = document.createElement('option'); o.value = d.sn;
+      o.textContent = `${d.name || 'Устройство'} (${d.sn})` + (d.online === 1 ? ' · онлайн' : d.online === 0 ? ' · офлайн' : '') + (d.label ? ` · ${d.label}` : '');
+      sel.appendChild(o);
     }
-    if (!found.size) { msg('Серийный номер найти не удалось. Введите его вручную: он на наклейке станции и в приложении в сведениях об устройстве.', 'warn'); return; }
-    msg(found.size === 1 ? 'Нашёл устройство, серийный номер подставлен.' : 'Нашёл несколько устройств, выберите нужное:', 'ok');
-    for (const [sn, name] of found) {
-      if (found.size === 1) { $('sn').value = sn; saveSettings(); break; }
-      const b = document.createElement('button'); b.type = 'button'; b.textContent = name ? `${sn} — ${name}` : sn;
-      b.onclick = () => { $('sn').value = sn; saveSettings(); box.textContent = ''; msg('Серийный номер подставлен.', 'ok'); };
-      box.appendChild(b);
-    }
+    sel.hidden = false;
+    const cur = devices.find(d => d.sn === $('sn').value.trim());
+    if (cur) sel.value = cur.sn;
+    if (devices.length === 1) { sel.value = devices[0].sn; fillSerial(devices[0].sn); msg('Нашёл устройство, серийный номер подставлен.', 'ok'); }
+    else msg(`Найдено устройств: ${devices.length}. Выберите нужное в списке.`, 'ok');
   } catch (e) { msg(e.message + (e instanceof TypeError ? ' (нет сети или запрос заблокирован браузером)' : ''), 'bad'); }
   finally { $('find').disabled = false; }
 };
