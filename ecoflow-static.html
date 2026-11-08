@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EcoFlow River 2 Pro</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0d10">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --bg:#0b0d10; --card:#16191d; --line:#262b32; --txt:#e6e9ee; --mut:#8a94a3; --ok:#3fb950; --bad:#f85149; --acc:#2f81f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; max-width:760px; margin-inline:auto; background:var(--bg); color:var(--txt); font:15px/1.4 system-ui,sans-serif; }
+  h1 { font-size:18px; margin:0; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); margin:0 0 10px; }
+  .top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px; }
+  .small { font-size:12px; color:var(--mut); } .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:#d29922; }
+
+  /* ---- hero (like the app) ---- */
+  .hero { background:#050505; padding:22px 14px 16px; }
+  .io { display:flex; justify-content:space-around; text-align:left; }
+  .lbl { font-size:18px; } .lbl.in { color:#4cc464; } .lbl.out { color:#c7842f; }
+  .big { font-size:46px; font-weight:600; color:#9aa0a6; line-height:1.1; }
+  .big small { font-size:18px; margin-left:3px; color:#8a8f96; }
+  .ports { display:flex; justify-content:space-around; margin-top:24px; }
+  .port { background:none; border:0; color:#c9ced6; display:flex; flex-direction:column; align-items:center; gap:8px; font:inherit; cursor:default; padding:0; }
+  .port[data-target] { cursor:pointer; }
+  .ring { width:58px; height:58px; border-radius:50%; background:#26292e; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; border:2px solid transparent; transition:border-color .3s; }
+  .port.on .ring { border-color:var(--ok); }
+  .pw { font-size:17px; }
+  .batt { margin-top:20px; }
+  .bar { height:8px; background:#1d2126; border-radius:6px; overflow:hidden; }
+  .bar > div { height:100%; width:0; background:var(--ok); transition:width .4s, background .4s; }
+  .brow { display:flex; justify-content:space-between; margin-top:6px; color:#9aa0a6; }
+
+  /* ---- forms / commands ---- */
+  details.cmd { border:1px solid var(--line); border-radius:10px; margin-bottom:8px; background:#0f1215; }
+  details.cmd > summary { padding:11px 12px; cursor:pointer; display:flex; justify-content:space-between; gap:10px; }
+  .cur { color:var(--mut); font-size:13px; text-align:right; }
+  .body { padding:0 12px 12px; }
+  .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:0 0 3px; }
+  input, select, textarea { width:100%; background:#0b0d10; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px; font:inherit; }
+  input[type=checkbox] { width:auto; }
+  textarea { font:13px ui-monospace,monospace; min-height:110px; }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-bottom:10px; }
+  .chk { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--txt); margin:4px 0; }
+  button.btn { background:var(--acc); color:#fff; border:0; border-radius:8px; padding:9px 14px; cursor:pointer; margin:10px 8px 0 0; font:inherit; }
+  button.btn.sec { background:#2a3038; }
+  button.btn.danger { background:#b62324; }
+  button.btn:disabled { opacity:.5; cursor:default; }
+  .pwwrap { position:relative; } .pwwrap input { padding-right:44px; }
+  .eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); background:none; border:0; color:var(--mut); cursor:pointer; padding:6px 8px; line-height:0; }
+  .eye:hover { color:var(--txt); }
+  .barRow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .found button { background:#2a3038; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:6px 10px; cursor:pointer; margin:6px 6px 0 0; font:inherit; }
+  pre { background:#0b0d10; border:1px solid var(--line); border-radius:8px; padding:8px; overflow:auto; font-size:12px; max-height:220px; white-space:pre-wrap; word-break:break-all; margin:8px 0 0; }
+  table { width:100%; border-collapse:collapse; font:13px ui-monospace,monospace; }
+  td { padding:4px 6px; border-bottom:1px solid var(--line); word-break:break-all; } td:first-child { color:var(--mut); width:55%; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>EcoFlow River 2 Pro</h1>
+  <span class="small"><span id="conn" class="bad">○ не подключено</span> · <span id="age">–</span></span>
+</div>
+
+<div class="card" id="connCard">
+  <h2>Подключение</h2>
+  <form id="f" autocomplete="on">
+    <div class="row">
+      <div><label for="email">Email (аккаунт приложения EcoFlow)</label><input id="email" name="email" type="email" autocomplete="username" required></div>
+      <div><label for="pw">Пароль</label>
+        <div class="pwwrap"><input id="pw" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="eye" id="eye" title="Показать пароль" aria-label="Показать пароль"></button></div></div>
+    </div>
+    <div class="row">
+      <div><label for="sn">Серийный номер станции (16 символов)</label><input id="sn" name="sn" autocomplete="off" spellcheck="false" required>
+        <button class="btn sec" type="button" id="find" style="margin-top:6px">Найти серийник (экспериментально)</button>
+        <div class="found" id="found"></div></div>
+      <div><label for="base">Сервер</label>
+        <select id="base">
+          <option value="https://api.ecoflow.com">api.ecoflow.com</option>
+          <option value="https://api-e.ecoflow.com">api-e.ecoflow.com (Европа)</option>
+        </select></div>
+      <div><label for="poll">Опрос, секунд</label><input id="poll" type="number" min="5" value="10"></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="remMail" checked> Запомнить email, серийный номер и настройки в этом браузере</label>
+    <label class="chk"><input type="checkbox" id="remPw"> Запомнить и пароль (хранится в браузере открытым текстом)</label>
+    <p class="small" id="remWarn" hidden>Пароль будет лежать в хранилище этого сайта в открытом виде. Включайте только на своём компьютере. Безопаснее оставить галочку выключенной и дать браузеру сохранить пароль самому: он предложит это после входа.</p>
+    <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Дополнительно</summary>
+      <label for="wsurl" style="margin-top:8px">Адрес WebSocket (пусто = по умолчанию)</label>
+      <input id="wsurl" placeholder="wss://mqtt-e.ecoflow.com:8084/mqtt" spellcheck="false">
+    </details>
+    <button class="btn" id="go" type="submit">Подключиться</button>
+  </form>
+  <div id="connBar" class="barRow" hidden>
+    <button class="btn sec" id="stop" type="button" style="margin-top:0">Отключиться</button>
+    <button class="btn sec" id="showForm" type="button" style="margin-top:0">Настройки</button>
+  </div>
+  <div id="msg" class="small" style="margin-top:8px"></div>
+  <pre id="findLog" hidden></pre>
+  <button class="btn sec" id="install" type="button" hidden>Установить как приложение</button>
+  <p class="small">Страница общается напрямую с серверами EcoFlow, никаких других серверов у неё нет. Вкладка должна быть открыта, чтобы данные обновлялись: закрыли вкладку, и соединение закрылось.</p>
+</div>
+
+<div class="card hero">
+  <div class="io">
+    <div><div class="lbl in">Input</div><div class="big"><span id="inW">–</span><small>w</small></div></div>
+    <div><div class="lbl out">Output</div><div class="big"><span id="outW">–</span><small>w</small></div></div>
+  </div>
+  <div class="ports">
+    <button class="port" id="pAC" data-target="c_ac" type="button" title="AC output">
+      <span class="ring"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9v2M15 9v2"/><path d="M9 15c1 1 5 1 6 0"/></svg></span>
+      <span class="pw"><span id="acW">–</span>W</span>
+    </button>
+    <button class="port" id="pDC" data-target="c_dc" type="button" title="12V DC output">
+      <span class="ring">DC</span>
+      <span class="pw"><span id="dcW">–</span>W</span>
+    </button>
+    <button class="port" id="pUSB" type="button" title="USB-A + USB-C output">
+      <span class="ring"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.3h16M4 14.7h16M9.3 4v16M14.7 4v16"/></svg></span>
+      <span class="pw"><span id="usbW">–</span>W</span>
+    </button>
+  </div>
+  <div class="batt">
+    <div class="bar"><div id="socbar"></div></div>
+    <div class="brow"><span id="soc">–</span><span id="rem">–</span></div>
+  </div>
+</div>
+<p class="small" id="hint"></p>
+
+<div class="card">
+  <h2>Команды</h2>
+  <p class="small">Значения в полях подставляются с устройства. Поле, которое вы изменили, не перезаписывается обновлениями. Кнопка «Сбросить» вернёт значение с устройства.</p>
+  <div id="cmds"></div>
+
+  <details class="cmd" id="c_custom">
+    <summary><span>Своя команда (JSON)</span><span class="cur">для опытных</span></summary>
+    <div class="body">
+      <textarea id="customJson">{
+  "moduleType": 5,
+  "operateType": "mpptCar",
+  "params": { "enabled": 1 }
+}</textarea>
+      <button class="btn" id="customSend" type="button">Отправить</button>
+      <span id="res_custom" class="small"></span>
+    </div>
+  </details>
+
+  <label style="margin-top:12px">Последний ответ устройства на команду</label>
+  <pre id="lastReply">–</pre>
+</div>
+
+<div class="card">
+  <h2>Все значения</h2>
+  <input id="filter" placeholder="Фильтр по ключу…" style="margin-bottom:8px">
+  <table id="raw"></table>
+</div>
+
+<div class="card">
+  <h2>Последние сообщения (raw)</h2>
+  <pre id="recent"></pre>
+</div>
+
+<script>
+// <codec>
+const enc = new TextEncoder(), dec = new TextDecoder();
+function varint(n) { const o = []; do { let b = n % 128; n = Math.floor(n / 128); if (n > 0) b |= 128; o.push(b); } while (n > 0); return o; }
+function str(s) { const b = enc.encode(s); return [b.length >> 8, b.length & 255, ...b]; }
+function packet(first, body) { return new Uint8Array([first, ...varint(body.length), ...body]); }
+function connectPacket(clientId, user, pass, keepalive = 30) {
+  return packet(0x10, [0, 4, 0x4D, 0x51, 0x54, 0x54, 4, 0xC2, keepalive >> 8, keepalive & 255, ...str(clientId), ...str(user), ...str(pass)]);
+}
+function subscribePacket(id, topic) { return packet(0x82, [id >> 8, id & 255, ...str(topic), 0]); }
+function publishPacket(topic, payload) { return packet(0x30, [...str(topic), ...enc.encode(payload)]); }
+const pingPacket = () => new Uint8Array([0xC0, 0]);
+const disconnectPacket = () => new Uint8Array([0xE0, 0]);
+function parsePackets(buf) {
+  const packets = []; let i = 0;
+  while (i < buf.length) {
+    let j = i + 1, mult = 1, len = 0, complete = false;
+    while (j < buf.length) { const b = buf[j++]; len += (b & 127) * mult; mult *= 128; if (!(b & 128)) { complete = true; break; } }
+    if (!complete || j + len > buf.length) break;
+    packets.push({ type: buf[i] >> 4, flags: buf[i] & 15, body: buf.slice(j, j + len) });
+    i = j + len;
+  }
+  return { packets, rest: buf.slice(i) };
+}
+function decodePublish(p) {
+  const tl = (p.body[0] << 8) | p.body[1];
+  const topic = dec.decode(p.body.slice(2, 2 + tl));
+  const qos = (p.flags >> 1) & 3;
+  const start = 2 + tl + (qos > 0 ? 2 : 0);
+  return { topic, payload: dec.decode(p.body.slice(start)) };
+}
+const CONNACK_TEXT = { 0:'принято', 1:'неподдерживаемая версия протокола', 2:'клиентский ID отклонён', 3:'сервер недоступен', 4:'неверный логин или пароль', 5:'нет прав' };
+// </codec>
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); })).toUpperCase();
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+
+// ---------- state ----------
+let S = {}, last = 0, lastSetReply = null, recent = [];
+let ws = null, session = null, connected = false, manual = true, buf = new Uint8Array(0);
+let pingT = null, pollT = null, reT = null;
+
+const TYPE_PREFIX = { pdStatus:'pd', bmsStatus:'bms_bmsStatus', emsStatus:'bms_emsStatus', mpptStatus:'mppt', invStatus:'inv' };
+function flatten(o, p = '', out = {}) {
+  if (Array.isArray(o)) o.forEach((v, i) => flatten(v, `${p}[${i}]`, out));
+  else if (o && typeof o === 'object') for (const k of Object.keys(o)) flatten(o[k], p ? `${p}.${k}` : k, out);
+  else out[p] = o;
+  return out;
+}
+// station pushes already-dotted keys ("pd.soc"); older payloads use typeCode + bare keys; get_reply uses data.quotaMap
+function ingest(msg) {
+  const qm = msg && msg.data && msg.data.quotaMap;
+  if (qm && typeof qm === 'object') { Object.assign(S, flatten(qm)); return; }
+  if (msg && msg.params && typeof msg.params === 'object') {
+    const pre = TYPE_PREFIX[msg.typeCode], flat = flatten(msg.params);
+    for (const k of Object.keys(flat)) S[k.includes('.') ? k : `${pre || 'other'}.${k}`] = flat[k];
+  }
+}
+
+// ---------- value helpers ----------
+function g(key) {
+  if (key in S) return S[key];
+  const tail = key.split('.').pop();
+  const m = Object.keys(S).filter(k => k === tail || k.endsWith('.' + tail));
+  return m.length === 1 ? S[m[0]] : undefined;
+}
+const num = v => (v === undefined || v === null || v === '' || isNaN(+v)) ? undefined : +v;
+const sum = (...a) => { const v = a.map(num).filter(x => x !== undefined); return v.length ? v.reduce((x, y) => x + y, 0) : undefined; };
+const fmt = v => (v === undefined ? '–' : Math.round(v));
+const onoff = v => (v === undefined ? '–' : (+v ? 'ON' : 'OFF'));
+function fmtMin(m) { if (m == null || m <= 0 || m >= 5999) return null; const h = Math.floor(m / 60); return h ? `${h} ч ${m % 60} мин` : `${m} мин`; }
+
+// ---------- settings persistence ----------
+const KEY = 'ecoflow_static_v1';
+(function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (!s) return;
+    $('email').value = s.email || ''; $('sn').value = s.sn || ''; $('base').value = s.base || $('base').value;
+    $('poll').value = s.poll || 10; $('wsurl').value = s.wsurl || '';
+    $('remPw').checked = !!s.pw; if (s.pw) $('pw').value = s.pw;
+    $('remWarn').hidden = !$('remPw').checked;
+  } catch {}
+})();
+function saveSettings() {
+  try {
+    if (!$('remMail').checked) { localStorage.removeItem(KEY); return; }
+    const s = { email:$('email').value.trim(), sn:$('sn').value.trim(), base:$('base').value, poll:$('poll').value, wsurl:$('wsurl').value.trim() };
+    if ($('remPw').checked) s.pw = $('pw').value;
+    localStorage.setItem(KEY, JSON.stringify(s));
+  } catch {}
+}
+$('remPw').onchange = () => { $('remWarn').hidden = !$('remPw').checked; };
+
+// ---------- connection ----------
+function showForm(show) {
+  $('f').hidden = !show; $('connBar').hidden = show;
+  $('go').disabled = false;   // also while connected, so "Настройки" -> "Подключиться" can reconnect with new data
+  if (!show) { $('pw').type = 'password'; setEye(false); }
+}
+function setConn(text, cls) { $('conn').textContent = text; $('conn').className = cls; }
+function msg(text, cls) { $('msg').textContent = text; $('msg').className = 'small ' + (cls || ''); }
+function send(pkt) { if (ws && ws.readyState === 1) ws.send(pkt); }
+function stopTimers() { clearInterval(pingT); clearInterval(pollT); clearTimeout(reT); pingT = pollT = reT = null; }
+
+async function connect() {
+  const email = $('email').value.trim(), password = $('pw').value, sn = $('sn').value.trim(), base = $('base').value;
+  if (!email || !password || !sn) { msg('Заполните email, пароль и серийный номер.', 'bad'); return; }
+  if (sn.length !== 16) msg(`Серийный номер должен быть из 16 символов, у вас ${sn.length}. Сверьте с наклейкой на станции.`, 'warn');
+  saveSettings();
+  if (ws) { const old = ws; ws = null; try { old.close(); } catch {} }
+  connected = false;
+  manual = false; stopTimers(); $('go').disabled = true;
+  S = {}; lastSetReply = null; recent = []; draw();
+  try {
+    setConn('… вход', 'warn'); if (sn.length === 16) msg('');
+    const r1 = await fetch(base + '/auth/login', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, password: b64(password), scene:'IOT_APP', userType:'ECOFLOW', oauth:{ bundleId:'com.ef.EcoFlow' }, os:'android', osVersion:'13', appVersion:'1.0.0' }) });
+    const login = await r1.json();
+    if (String(login.code) !== '0') throw new Error(`Вход не удался: ${login.code} ${login.message}`);
+    const userId = login.data.user.userId, token = login.data.token;
+    const r2 = await fetch(`${base}/iot-auth/app/certification?userId=${encodeURIComponent(userId)}`, { headers:{ Authorization:'Bearer ' + token } });
+    const cert = await r2.json();
+    if (String(cert.code) !== '0') throw new Error(`MQTT-доступ не выдан: ${cert.code} ${cert.message}`);
+    const c = cert.data;
+    session = { userId, sn, user:c.certificateAccount, pass:c.certificatePassword, clientId:`ANDROID_${uuid()}_${userId}`,
+                url: $('wsurl').value.trim() || `wss://${c.url}:8084/mqtt` };
+    openWs();
+  } catch (e) {
+    setConn('○ не подключено', 'bad');
+    msg(e.message + (e instanceof TypeError ? ' (нет сети или запрос заблокирован браузером)' : ''), 'bad');
+    showForm(true); manual = true;
+  }
+}
+
+function openWs() {
+  clearTimeout(reT);
+  setConn('… WebSocket', 'warn');
+  buf = new Uint8Array(0);
+  const sock = new WebSocket(session.url, 'mqtt'); sock.binaryType = 'arraybuffer'; ws = sock;
+  const openTimer = setTimeout(() => { if (sock.readyState !== 1) try { sock.close(); } catch {} }, 10000);
+  sock.onopen = () => { clearTimeout(openTimer); sock.send(connectPacket(session.clientId, session.user, session.pass, 30)); };
+  sock.onerror = () => {};
+  sock.onclose = () => {
+    clearTimeout(openTimer);
+    if (sock !== ws) return;
+    connected = false; clearInterval(pingT); clearInterval(pollT);
+    if (manual) { setConn('○ отключено', 'bad'); showForm(true); return; }
+    setConn('○ связь потеряна, переподключаюсь…', 'warn');
+    reT = setTimeout(openWs, 5000);
+  };
+  sock.onmessage = ev => {
+    const add = new Uint8Array(ev.data), merged = new Uint8Array(buf.length + add.length);
+    merged.set(buf); merged.set(add, buf.length);
+    const { packets, rest } = parsePackets(merged); buf = rest;
+    for (const p of packets) onPacket(p);
+  };
+}
+
+function onPacket(p) {
+  if (p.type === 2) {                                  // CONNACK
+    const rc = p.body[1];
+    if (rc !== 0) {
+      manual = true; msg(`Брокер отклонил вход: ${CONNACK_TEXT[rc] || rc}. Нажмите «Подключиться» ещё раз.`, 'bad');
+      try { ws.close(); } catch {} return;
+    }
+    connected = true; setConn('● подключено', 'ok'); msg('');
+    try { // ask the browser's password manager to save these credentials (Chrome, secure context only)
+      if (window.PasswordCredential && navigator.credentials && navigator.credentials.store) {
+        const id = $('email').value.trim();
+        navigator.credentials.store(new PasswordCredential({ id, password:$('pw').value, name:id })).catch(() => {});
+      }
+    } catch {}
+    showForm(false);
+    const { userId, sn } = session;
+    [`/app/device/property/${sn}`, `/app/${userId}/${sn}/thing/property/get_reply`, `/app/${userId}/${sn}/thing/property/set_reply`]
+      .forEach((t, i) => send(subscribePacket(i + 1, t)));
+    pingT = setInterval(() => send(pingPacket()), 20000);
+    const every = Math.max(5, +$('poll').value || 10) * 1000;
+    setTimeout(requestQuotas, 800); pollT = setInterval(requestQuotas, every);
+  } else if (p.type === 3) {                           // PUBLISH
+    const m = decodePublish(p); let parsed = null, txt = m.payload;
+    last = Date.now();
+    try { parsed = JSON.parse(txt); } catch { txt = `[не JSON, ${txt.length} симв.]`; }
+    recent.push({ t:new Date().toISOString(), topic:m.topic, payload:txt.slice(0, 1500) }); if (recent.length > 15) recent.shift();
+    if (parsed) { if (/set_reply$/.test(m.topic)) lastSetReply = { t:new Date().toISOString(), ...parsed }; else ingest(parsed); }
+    draw();
+  }
+}
+
+function requestQuotas() {
+  if (!connected || !session) return;
+  send(publishPacket(`/app/${session.userId}/${session.sn}/thing/property/get`,
+    JSON.stringify({ from:'Android', id:String(Date.now()).slice(-9), version:'1.1', moduleType:0, operateType:'latestQuotas', params:{} })));
+}
+
+function disconnect() {
+  manual = true; stopTimers();
+  if (ws) { try { send(disconnectPacket()); ws.close(); } catch {} }
+  connected = false; setConn('○ отключено', 'bad'); showForm(true);
+}
+$('f').addEventListener('submit', e => { e.preventDefault(); connect(); });
+$('stop').onclick = disconnect;
+window.addEventListener('pagehide', () => { if (ws && connected) try { ws.send(disconnectPacket()); } catch {} });
+
+// ---------- command definitions (from EcoFlow's River 2 Pro docs) ----------
+const ONOFF = [[1, 'On'], [0, 'Off']];
+const CMDS = [
+  { id:'dc', title:'12V DC выход', moduleType:5, operateType:'mpptCar',
+    cur: () => onoff(g('pd.carState')),
+    fields:[ { name:'enabled', label:'Выход', type:'select', opts:ONOFF, from:'pd.carState' } ] },
+  { id:'ac', title:'AC выход', moduleType:5, operateType:'acOutCfg',
+    cur: () => `${onoff(g('mppt.cfgAcEnabled'))} · ${fmt(num(g('mppt.cfgAcOutVol')))} V · ${fmt(num(g('mppt.cfgAcOutFreq')))} Hz · X-Boost ${onoff(g('mppt.cfgAcXboost'))}`,
+    fields:[
+      { name:'enabled', label:'AC выход', type:'select', opts:ONOFF, from:'mppt.cfgAcEnabled' },
+      { name:'xboost', label:'X-Boost', type:'select', opts:ONOFF, from:'mppt.cfgAcXboost' },
+      { name:'out_voltage', label:'Напряжение (V)', type:'number', from:'mppt.cfgAcOutVol', fallback:230 },
+      { name:'out_freq', label:'Частота', type:'select', opts:[[1, '50 Hz'], [2, '60 Hz']], from:'mppt.cfgAcOutFreq', map: v => (+v === 60 ? 2 : 1) } ] },
+  { id:'wh', title:'Energy management (резерв)', moduleType:1, operateType:'watthConfig',
+    cur: () => `${onoff(g('pd.watchIsConfig'))} · резерв ${fmt(num(g('pd.bpPowerSoc')))}%`,
+    fields:[
+      { name:'isConfig', label:'Включено', type:'select', opts:ONOFF, from:'pd.watchIsConfig' },
+      { name:'bpPowerSoc', label:'Backup reserve (%)', type:'number', min:0, max:100, from:'pd.bpPowerSoc' },
+      { name:'minDsgSoc', label:'Discharge limit (%) — «not used yet»', type:'number', min:0, max:100, from:'bms_emsStatus.minDsgSoc', fallback:30 },
+      { name:'minChgSoc', label:'Charge limit (%) — «not used yet»', type:'number', min:0, max:100, from:'bms_emsStatus.maxChargeSoc', fallback:88 } ] },
+  { id:'chg', title:'Лимит заряда', moduleType:2, operateType:'upsConfig',
+    cur: () => `${fmt(num(g('bms_emsStatus.maxChargeSoc')))}%`,
+    fields:[ { name:'maxChgSoc', label:'Charge limit (%)', type:'number', min:0, max:100, from:'bms_emsStatus.maxChargeSoc' } ] },
+  { id:'dsg', title:'Лимит разряда', moduleType:2, operateType:'dsgCfg',
+    cur: () => `${fmt(num(g('bms_emsStatus.minDsgSoc')))}%`,
+    fields:[ { name:'minDsgSoc', label:'Discharge limit (%)', type:'number', min:0, max:100, from:'bms_emsStatus.minDsgSoc' } ] }
+];
+const fid = (c, f) => `f_${c.id}_${f.name}`;
+
+function payload(c) {
+  const params = {};
+  for (const f of c.fields) { const v = $(fid(c, f)).value; if (v === '' || isNaN(+v)) return null; params[f.name] = +v; }
+  return { moduleType:c.moduleType, operateType:c.operateType, params };
+}
+function preview(c) { const p = payload(c); $('prev_' + c.id).textContent = p ? JSON.stringify(p, null, 2) : 'Заполните все поля'; }
+
+function sendCmd(body, out) {
+  const fail = t => { out.textContent = t; out.className = 'small bad'; return false; };
+  if (!Number.isInteger(body.moduleType) || typeof body.operateType !== 'string' || !body.params || typeof body.params !== 'object')
+    return fail('Нужны целое moduleType, строка operateType и объект params');
+  if (!connected || !session) return fail('Нет подключения к станции');
+  if (!confirm('Отправить команду?\n\n' + JSON.stringify(body, null, 2))) return false;
+  const m = { from:'Android', id:Number(String(Date.now()).slice(-9)), version:'1.0', sn:session.sn,
+              moduleType:body.moduleType, operateType:body.operateType, params:body.params };
+  send(publishPacket(`/app/${session.userId}/${session.sn}/thing/property/set`, JSON.stringify(m)));
+  out.textContent = 'Отправлено, жду ответ устройства…'; out.className = 'small ok';
+  setTimeout(requestQuotas, 2000);
+  return true;
+}
+
+(function build() {
+  const box = $('cmds');
+  for (const c of CMDS) {
+    const d = document.createElement('details'); d.className = 'cmd'; d.id = 'c_' + c.id;
+    const fields = c.fields.map(f => {
+      const ctl = f.type === 'select'
+        ? `<select id="${fid(c, f)}">${f.opts.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`
+        : `<input id="${fid(c, f)}" type="number" step="1" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''}>`;
+      return `<div><label>${f.label}</label>${ctl}</div>`;
+    }).join('');
+    d.innerHTML = `<summary><span>${c.title}</span><span class="cur" id="cur_${c.id}">–</span></summary>
+      <div class="body">
+        <div class="fields">${fields}</div>
+        <label style="margin-top:10px">Будет отправлено (${c.operateType}, moduleType ${c.moduleType})</label>
+        <pre id="prev_${c.id}"></pre>
+        <button class="btn" type="button" data-send="${c.id}">Отправить</button>
+        <button class="btn sec" type="button" data-reset="${c.id}">Сбросить</button>
+        <span id="res_${c.id}" class="small"></span>
+      </div>`;
+    box.appendChild(d);
+    for (const f of c.fields) {
+      const el = $(fid(c, f)), mark = () => { el.dataset.dirty = '1'; preview(c); };
+      el.addEventListener('input', mark); el.addEventListener('change', mark);
+    }
+    d.querySelector('[data-send]').onclick = () => {
+      const body = payload(c), out = $('res_' + c.id);
+      if (!body) { out.textContent = 'Заполните все поля'; out.className = 'small bad'; return; }
+      if (sendCmd(body, out)) c.fields.forEach(f => delete $(fid(c, f)).dataset.dirty);
+    };
+    d.querySelector('[data-reset]').onclick = () => { c.fields.forEach(f => delete $(fid(c, f)).dataset.dirty); refreshCards(); $('res_' + c.id).textContent = ''; };
+    preview(c);
+  }
+  $('customSend').onclick = () => {
+    const out = $('res_custom');
+    try { sendCmd(JSON.parse($('customJson').value), out); }
+    catch (e) { out.textContent = 'Ошибка JSON: ' + e.message; out.className = 'small bad'; }
+  };
+  document.querySelectorAll('.port[data-target]').forEach(b => b.onclick = () => {
+    const d = $(b.dataset.target); if (d) { d.open = true; d.scrollIntoView({ behavior:'smooth', block:'center' }); }
+  });
+})();
+
+function refreshCards() {
+  for (const c of CMDS) {
+    $('cur_' + c.id).textContent = c.cur();
+    for (const f of c.fields) {
+      const el = $(fid(c, f));
+      if (el.dataset.dirty) continue;
+      let v = g(f.from);
+      if (v !== undefined) { if (f.map) v = f.map(v); el.value = String(v); }
+      else if (f.fallback !== undefined && el.value === '') el.value = String(f.fallback);
+    }
+    preview(c);
+  }
+}
+
+// ---------- hero ----------
+function drawHero() {
+  const inW = num(g('pd.wattsInSum')) ?? sum(g('inv.inputWatts'), g('mppt.inWatts'), g('pd.typecChaWatts'));
+  const outW = num(g('pd.wattsOutSum'));
+  $('inW').textContent = fmt(inW); $('outW').textContent = fmt(outW);
+  $('acW').textContent = fmt(num(g('inv.outputWatts')));
+  $('dcW').textContent = fmt(num(g('pd.carWatts')));
+  $('usbW').textContent = fmt(sum(g('pd.usb1Watts'), g('pd.typec1Watts')));
+  $('pAC').classList.toggle('on', +g('mppt.cfgAcEnabled') === 1);
+  $('pDC').classList.toggle('on', +g('pd.carState') === 1);
+  const soc = num(g('pd.soc') ?? g('bms_emsStatus.lcdShowSoc'));
+  $('soc').textContent = soc !== undefined ? `Заряд ${Math.round(soc)}%` : 'Заряд –';
+  const bar = $('socbar'); bar.style.width = (soc || 0) + '%';
+  bar.style.background = soc < 15 ? 'var(--bad)' : soc < 40 ? '#d29922' : 'var(--ok)';
+  let rem = '–';
+  if ((inW || 0) > (outW || 0)) { const t = fmtMin(num(g('bms_emsStatus.chgRemainTime') ?? g('bms_bmsStatus.remainTime'))); if (t) rem = t + ' до полного'; }
+  else { const t = fmtMin(num(g('bms_emsStatus.dsgRemainTime'))); if (t) rem = 'осталось ' + t; }
+  $('rem').textContent = rem;
+}
+function renderRaw() {
+  const f = $('filter').value.toLowerCase();
+  $('raw').innerHTML = Object.keys(S).sort().filter(k => k.toLowerCase().includes(f))
+    .map(k => `<tr><td>${esc(k)}</td><td>${esc(JSON.stringify(S[k]))}</td></tr>`).join('') || '<tr><td>Данных пока нет</td></tr>';
+}
+$('filter').oninput = renderRaw;
+
+function draw() {
+  drawHero(); refreshCards(); renderRaw();
+  $('hint').textContent = Object.keys(S).length ? '' : (connected ? 'Данных пока нет, жду ответ станции…' : '');
+  $('lastReply').textContent = lastSetReply ? JSON.stringify(lastSetReply, null, 2) : '–';
+  $('recent').textContent = recent.map(r => `${r.t}  ${r.topic}\n${r.payload}`).join('\n\n');
+}
+setInterval(() => { $('age').textContent = last ? `обновлено ${Math.round((Date.now() - last) / 1000)} с назад` : 'нет данных'; }, 1000);
+
+// ---------- show/hide password ----------
+const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5.6 19 2 12 2 12a18.5 18.5 0 0 1 4.1-5.1M9.9 5.2A10 10 0 0 1 12 5c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M14.1 14.1a3 3 0 0 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>';
+function setEye(visible) {
+  $('eye').innerHTML = visible ? EYE_OFF : EYE;
+  $('eye').title = $('eye').ariaLabel = visible ? 'Скрыть пароль' : 'Показать пароль';
+}
+setEye(false);
+$('eye').onclick = () => { const show = $('pw').type === 'password'; $('pw').type = show ? 'text' : 'password'; setEye(show); };
+$('showForm').onclick = () => { $('f').hidden = !$('f').hidden; };
+
+// ---------- find serial number (experimental) ----------
+// The documented device-list call (/iot-open/sign/device/list) needs developer keys. With an app login we can only try
+// the app's own (undocumented) endpoints. These paths are unverified guesses; every attempt is shown so nothing is hidden.
+const FIND_PATHS = ['/iot-service/user/device', '/iot-service/user/device/list', '/provider-service/user/device/list'];
+function collectSerials(node, out) {
+  if (Array.isArray(node)) { node.forEach(n => collectSerials(n, out)); return; }
+  if (!node || typeof node !== 'object') return;
+  for (const k of Object.keys(node)) {
+    const v = node[k];
+    if (/^(sn|deviceSn|serialNumber)$/i.test(k) && typeof v === 'string' && /^[A-Z][A-Z0-9]{9,19}$/.test(v))
+      out.set(v, String(node.deviceName || node.name || node.productName || ''));
+    else collectSerials(v, out);
+  }
+}
+$('find').onclick = async () => {
+  const email = $('email').value.trim(), password = $('pw').value, base = $('base').value;
+  const log = $('findLog'), box = $('found'); box.textContent = ''; log.hidden = false; log.textContent = '';
+  const add = t => { log.textContent += t + '\n'; };
+  if (!email || !password) { msg('Для поиска нужны email и пароль.', 'bad'); return; }
+  msg('Ищу устройства…', 'warn'); $('find').disabled = true;
+  try {
+    const r1 = await fetch(base + '/auth/login', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, password: b64(password), scene:'IOT_APP', userType:'ECOFLOW', oauth:{ bundleId:'com.ef.EcoFlow' }, os:'android', osVersion:'13', appVersion:'1.0.0' }) });
+    const login = await r1.json();
+    if (String(login.code) !== '0') throw new Error(`Вход не удался: ${login.code} ${login.message}`);
+    const token = login.data.token, found = new Map();
+    for (const path of FIND_PATHS) {
+      try {
+        const r = await fetch(base + path, { headers:{ Authorization:'Bearer ' + token } });
+        const txt = await r.text(); add(`${path} → HTTP ${r.status}: ${txt.slice(0, 300)}`);
+        try { collectSerials(JSON.parse(txt), found); } catch {}
+      } catch (e) { add(`${path} → ошибка: ${e.message}`); }
+    }
+    if (!found.size) { msg('Серийный номер найти не удалось. Введите его вручную: он на наклейке станции и в приложении в сведениях об устройстве.', 'warn'); return; }
+    msg(found.size === 1 ? 'Нашёл устройство, серийный номер подставлен.' : 'Нашёл несколько устройств, выберите нужное:', 'ok');
+    for (const [sn, name] of found) {
+      if (found.size === 1) { $('sn').value = sn; saveSettings(); break; }
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = name ? `${sn} — ${name}` : sn;
+      b.onclick = () => { $('sn').value = sn; saveSettings(); box.textContent = ''; msg('Серийный номер подставлен.', 'ok'); };
+      box.appendChild(b);
+    }
+  } catch (e) { msg(e.message + (e instanceof TypeError ? ' (нет сети или запрос заблокирован браузером)' : ''), 'bad'); }
+  finally { $('find').disabled = false; }
+};
+
+// ---------- install as an app (PWA) ----------
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; $('install').hidden = false; });
+$('install').onclick = async () => { if (!deferredInstall) return; deferredInstall.prompt(); try { await deferredInstall.userChoice; } catch {} deferredInstall = null; $('install').hidden = true; };
+window.addEventListener('appinstalled', () => { $('install').hidden = true; });
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+draw();
+</script>
+</body>
+</html>
